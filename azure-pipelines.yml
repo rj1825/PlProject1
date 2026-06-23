@@ -21,22 +21,31 @@ trigger:
       - docs/**
 
 # ── Variables ──────────────────────────────────────────────────
-# ✏️  REPLACE the values below with your actual Azure resource names
+# ✏️  VERIFY / UPDATE the values below to match YOUR Azure DevOps setup
 variables:
   # --- Azure Container Registry ---
-  acrName:                         'easpacegameacr'       # ✏️ Your ACR name (no .azurecr.io)
-  acrLoginServer:                  '$(acrName).azurecr.io'
-  dockerRegistryServiceConnection: 'ACR-ServiceConnection' # ✏️ Your ACR service connection name
+  # ✏️ Replace with your actual ACR name (just the short name, no .azurecr.io)
+  acrName:        'easpacegameacr'
+  acrLoginServer: '$(acrName).azurecr.io'
+
+  # ✏️ IMPORTANT: Use EXACTLY one of your two Docker service connection names:
+  #    Option A → 'ACR Devops'   (try this first)
+  #    Option B → 'plpro1'       (use this if Option A fails)
+  dockerRegistryServiceConnection: 'ACR Devops'
 
   # --- Docker Image ---
-  imageName:    'space-defender'
-  imageTag:     '$(Build.BuildId)'
-  latestTag:    'latest'
+  imageName:  'space-defender'
+  imageTag:   '$(Build.BuildId)'
+  latestTag:  'latest'
 
   # --- Azure App Service ---
-  appServiceName:       'space-defender-webapp'  # ✏️ Your App Service name
-  resourceGroup:        'EA-SpaceDefender-RG'    # ✏️ Your Resource Group name
-  azureSubscription:    'Azure-ServiceConnection' # ✏️ Your Azure RM service connection name
+  # ✏️ Replace with your actual App Service name (from Azure Portal)
+  appServiceName: 'space-defender-webapp'
+  # ✏️ Replace with your actual Resource Group name
+  resourceGroup:  'EA-SpaceDefender-RG'
+  # ✏️ Replace with your Azure Resource Manager service connection name
+  #    (Project Settings → Service connections → type: Azure Resource Manager)
+  azureSubscription: 'Azure-ServiceConnection'
 
   # --- Agent ---
   vmImageName: 'ubuntu-latest'

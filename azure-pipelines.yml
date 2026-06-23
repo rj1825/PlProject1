@@ -125,21 +125,21 @@ stages:
       displayName: '✅ Build Stage Summary'
 
 # ═══════════════════════════════════════════════════════════════
-# STAGE 2 — CD: DEPLOY TO AZURE APP SERVICE
+# STAGE 2 — CD: DEPLOY TO AZURE CONTAINER APPS
 # Runs automatically after Stage 1 succeeds
 # ═══════════════════════════════════════════════════════════════
 
 - stage: Deploy
-  displayName: '🚀 Stage 2 — Deploy to Azure App Service'
+  displayName: '🚀 Stage 2 — Deploy to Azure Container Apps'
   dependsOn: Build
   condition: succeeded()
   jobs:
 
-  - deployment: DeployToAppService
-    displayName: 'Deploy Container to Azure App Service'
+  - deployment: DeployToContainerApp
+    displayName: 'Deploy Container to Azure Container Apps'
     pool:
       vmImage: $(vmImageName)
-    environment: 'Production'    # Creates a named environment (allows manual approval gates)
+    environment: 'Production'
     strategy:
       runOnce:
         deploy:
@@ -150,89 +150,89 @@ stages:
               echo "======================================================"
               echo "  Electronic Arts – Deploying Space Defender"
               echo "======================================================"
-              echo "  Image      : $(acrLoginServer)/$(imageName):$(imageTag)"
-              echo "  App Service: $(appServiceName)"
-              echo "  Res. Group : $(resourceGroup)"
+              echo "  Image         : $(acrLoginServer)/$(imageName):$(imageTag)"
+              echo "  Container App : $(appServiceName)"
+              echo "  Resource Group: $(resourceGroup)"
               echo "======================================================"
             displayName: '📋 Print Deploy Info'
 
-          # ── Step 2: Deploy container image to App Service ──────
-          - task: AzureWebAppContainer@1
-            displayName: '🌐 Deploy Container → Azure App Service'
-            inputs:
-              azureSubscription: $(azureSubscription)
-              appName:           $(appServiceName)
-              containers:        '$(acrLoginServer)/$(imageName):$(imageTag)'
-
-          # ── Step 3: Set App Service environment variables ──────
+          # ── Step 2: Install Container Apps CLI extension ───────
           - task: AzureCLI@2
-            displayName: '⚙️ Configure App Service Settings'
+            displayName: '🔧 Install Container Apps CLI Extension'
             inputs:
               azureSubscription: $(azureSubscription)
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
-                az webapp config appsettings set \
+                az extension add --name containerapp --upgrade -y
+                echo "✅ Container Apps extension ready"
+
+          # ── Step 3: Deploy new image to Container App ──────────
+          - task: AzureCLI@2
+            displayName: '🌐 Deploy Container → Azure Container Apps'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                echo "Deploying image: $(acrLoginServer)/$(imageName):$(imageTag)"
+                az containerapp update \
                   --name $(appServiceName) \
                   --resource-group $(resourceGroup) \
-                  --settings \
-                    WEBSITES_ENABLE_APP_SERVICE_STORAGE=false \
-                    DOCKER_REGISTRY_SERVER_URL=https://$(acrLoginServer) \
-                    BUILD_ID=$(Build.BuildId) \
-                    DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-                echo "✅ App settings updated"
+                  --image $(acrLoginServer)/$(imageName):$(imageTag)
+                echo "✅ Container App updated successfully"
 
-          # ── Step 4: Restart App Service ─────────────────────
-          - task: AzureCLI@2
-            displayName: '🔄 Restart App Service'
-            inputs:
-              azureSubscription: $(azureSubscription)
-              scriptType: bash
-              scriptLocation: inlineScript
-              inlineScript: |
-                az webapp restart \
-                  --name $(appServiceName) \
-                  --resource-group $(resourceGroup)
-                echo "✅ App Service restarted"
-
-          # ── Step 5: Wait for startup ─────────────────────────
+          # ── Step 4: Wait for deployment to complete ────────────
           - script: |
-              echo "⏳ Waiting 30 seconds for App Service to start..."
+              echo "⏳ Waiting 30 seconds for Container App to start..."
               sleep 30
-            displayName: '⏳ Wait for App Service Startup'
+            displayName: '⏳ Wait for Container App Startup'
 
-          # ── Step 6: Smoke test ──────────────────────────────
+          # ── Step 5: Get URL and Smoke Test ─────────────────────
           - task: AzureCLI@2
-            displayName: '🧪 HTTP Smoke Test'
+            displayName: '🧪 Smoke Test — Verify App is Live'
             continueOnError: true
             inputs:
               azureSubscription: $(azureSubscription)
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
-                APP_URL=$(az webapp show \
+                APP_URL=$(az containerapp show \
                   --name $(appServiceName) \
                   --resource-group $(resourceGroup) \
-                  --query defaultHostName \
+                  --query properties.configuration.ingress.fqdn \
                   --output tsv)
-                echo "Testing: https://$APP_URL"
+                echo "🌐 App URL: https://$APP_URL"
                 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://$APP_URL" || echo "000")
                 echo "HTTP Status: $HTTP_STATUS"
                 if [ "$HTTP_STATUS" = "200" ]; then
-                  echo "✅ SMOKE TEST PASSED — App is live!"
-                  echo "🌐 URL: https://$APP_URL"
+                  echo "✅ SMOKE TEST PASSED — Game is live!"
+                  echo "🎮 Play at: https://$APP_URL"
                 else
-                  echo "⚠️  Status $HTTP_STATUS — check app manually."
+                  echo "⚠️  Status $HTTP_STATUS — App may still be starting. Check manually."
                 fi
 
-          # ── Step 7: Final summary ────────────────────────────
-          - script: |
-              echo ""
-              echo "╔══════════════════════════════════════════════╗"
-              echo "║  🎮  DEPLOYMENT COMPLETE!                    ║"
-              echo "╠══════════════════════════════════════════════╣"
-              echo "║  App    : $(appServiceName)                  ║"
-              echo "║  Image  : $(imageName):$(imageTag)           ║"
-              echo "║  Build  : #$(Build.BuildId)                  ║"
-              echo "╚══════════════════════════════════════════════╝"
-            displayName: '🎉 Deployment Complete'
+          # ── Step 6: Deployment Summary ─────────────────────────
+          - task: AzureCLI@2
+            displayName: '🎉 Print Live App URL'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                APP_URL=$(az containerapp show \
+                  --name $(appServiceName) \
+                  --resource-group $(resourceGroup) \
+                  --query properties.configuration.ingress.fqdn \
+                  --output tsv)
+                echo ""
+                echo "╔══════════════════════════════════════════════════╗"
+                echo "║  🎮  DEPLOYMENT COMPLETE!                        ║"
+                echo "╠══════════════════════════════════════════════════╣"
+                echo "║  Container App : $(appServiceName)               ║"
+                echo "║  Image         : $(imageName):$(imageTag)        ║"
+                echo "║  Build         : #$(Build.BuildId)               ║"
+                echo "║  Live URL      : https://$APP_URL                ║"
+                echo "╚══════════════════════════════════════════════════╝"
+
+

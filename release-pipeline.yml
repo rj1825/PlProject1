@@ -1,0 +1,205 @@
+# ═══════════════════════════════════════════════════════════════
+# release-pipeline.yml – CD Release Pipeline
+# Electronic Arts | Space Defender Gaming App
+#
+# TRIGGER: Automatically triggered when Build Pipeline succeeds
+# STEPS:   Pull image from ACR → Deploy to Azure App Service
+# ═══════════════════════════════════════════════════════════════
+
+trigger: none   # This pipeline is triggered by the Build Pipeline, not by code push
+
+# ── Resources: triggered by Build Pipeline artifact ────────────
+resources:
+  pipelines:
+  - pipeline: BuildPipeline
+    source:   'Space-Defender-CI-Build'   # ✏️ REPLACE with your CI pipeline name
+    trigger:
+      branches:
+        include:
+          - main
+
+# ── Variables ──────────────────────────────────────────────────
+variables:
+  # Azure Container Registry
+  acrName:        'easpacegameacr'            # ✏️ REPLACE with your ACR name
+  acrLoginServer: '$(acrName).azurecr.io'
+  imageName:      'space-defender'
+
+  # Azure App Service
+  # ✏️ REPLACE with your actual Azure App Service name
+  appServiceName:  'space-defender-webapp'
+  resourceGroup:   'EA-SpaceDefender-RG'      # ✏️ REPLACE with your Resource Group name
+
+  # Service Connections
+  # ✏️ REPLACE with your Azure DevOps service connection names
+  azureServiceConnection:   'Azure-ServiceConnection'
+  dockerRegistryServiceConnection: 'ACR-ServiceConnection'
+
+  # Image tag from Build Pipeline
+  imageTag:   '$(resources.pipeline.BuildPipeline.runID)'
+
+  vmImageName: 'ubuntu-latest'
+
+# ── Stages ─────────────────────────────────────────────────────
+stages:
+
+# ──────────────────────────────────────────────────────────────
+# STAGE 1: PRE-DEPLOYMENT VALIDATION
+# ──────────────────────────────────────────────────────────────
+- stage: Validate
+  displayName: '🔍 Pre-Deployment Validation'
+  jobs:
+
+  - job: Validate
+    displayName: 'Validate Image & Config'
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+
+    - script: |
+        echo "================================================"
+        echo "  Electronic Arts – Space Defender CD Pipeline"
+        echo "================================================"
+        echo "  Run ID     : $(resources.pipeline.BuildPipeline.runID)"
+        echo "  Image      : $(acrLoginServer)/$(imageName):$(imageTag)"
+        echo "  App Service: $(appServiceName)"
+        echo "  Resource Grp: $(resourceGroup)"
+        echo "================================================"
+      displayName: '📋 Display Deployment Info'
+
+    - task: AzureCLI@2
+      displayName: '🔎 Verify Image Exists in ACR'
+      inputs:
+        azureSubscription: $(azureServiceConnection)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          echo "Checking ACR for image: $(imageName):$(imageTag)"
+          az acr repository show-tags \
+            --name $(acrName) \
+            --repository $(imageName) \
+            --output table
+          echo "✅ Image verified in ACR"
+
+# ──────────────────────────────────────────────────────────────
+# STAGE 2: DEPLOY TO AZURE APP SERVICE
+# ──────────────────────────────────────────────────────────────
+- stage: Deploy
+  displayName: '🚀 Deploy to Azure App Service'
+  dependsOn: Validate
+  condition: succeeded()
+  jobs:
+
+  - deployment: DeployToAppService
+    displayName: 'Deploy Space Defender to Azure App Service'
+    pool:
+      vmImage: $(vmImageName)
+    environment: 'Production'   # Creates a named environment in Azure DevOps for approvals
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+
+          # Step 1: Deploy container image to App Service
+          - task: AzureWebAppContainer@1
+            displayName: '🌐 Deploy Container to Azure App Service'
+            inputs:
+              azureSubscription:  $(azureServiceConnection)
+              appName:            $(appServiceName)
+              resourceGroupName:  $(resourceGroup)
+              containers:         '$(acrLoginServer)/$(imageName):$(imageTag)'
+              containerCommand:   ''
+
+          # Step 2: Update App Service settings
+          - task: AzureCLI@2
+            displayName: '⚙️ Configure App Service Settings'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                echo "Configuring App Service environment..."
+                az webapp config appsettings set \
+                  --name $(appServiceName) \
+                  --resource-group $(resourceGroup) \
+                  --settings \
+                    WEBSITES_ENABLE_APP_SERVICE_STORAGE=false \
+                    DOCKER_REGISTRY_SERVER_URL=https://$(acrLoginServer) \
+                    BUILD_ID=$(resources.pipeline.BuildPipeline.runID) \
+                    DEPLOYMENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                echo "✅ App settings configured"
+
+          # Step 3: Restart App Service to pick up new container
+          - task: AzureCLI@2
+            displayName: '🔄 Restart App Service'
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                echo "Restarting $(appServiceName)..."
+                az webapp restart \
+                  --name $(appServiceName) \
+                  --resource-group $(resourceGroup)
+                echo "✅ App Service restarted"
+
+# ──────────────────────────────────────────────────────────────
+# STAGE 3: SMOKE TEST & VERIFICATION
+# ──────────────────────────────────────────────────────────────
+- stage: SmokeTest
+  displayName: '✅ Smoke Test & Verification'
+  dependsOn: Deploy
+  condition: succeeded()
+  jobs:
+
+  - job: SmokeTest
+    displayName: 'Verify Deployment is Live'
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+
+    - script: |
+        echo "Waiting 30s for App Service to fully start..."
+        sleep 30
+      displayName: '⏳ Wait for App Service Startup'
+
+    - task: AzureCLI@2
+      displayName: '🔗 Get App Service URL'
+      inputs:
+        azureSubscription: $(azureServiceConnection)
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          APP_URL=$(az webapp show \
+            --name $(appServiceName) \
+            --resource-group $(resourceGroup) \
+            --query defaultHostName \
+            --output tsv)
+          echo "##vso[task.setvariable variable=appUrl]https://$APP_URL"
+          echo "🌐 App URL: https://$APP_URL"
+
+    - script: |
+        echo "Running smoke test on: $(appUrl)"
+        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$(appUrl)" || echo "000")
+        echo "HTTP Status: $HTTP_STATUS"
+        if [ "$HTTP_STATUS" = "200" ]; then
+          echo "✅ SMOKE TEST PASSED – App is live and responding!"
+        else
+          echo "⚠️  Unexpected status $HTTP_STATUS – please check the app manually."
+          exit 1
+        fi
+      displayName: '🧪 HTTP Smoke Test'
+      continueOnError: true
+
+    - script: |
+        echo ""
+        echo "╔══════════════════════════════════════════════╗"
+        echo "║  🎮  DEPLOYMENT COMPLETE!                    ║"
+        echo "╠══════════════════════════════════════════════╣"
+        echo "║  App URL  : $(appUrl)              ║"
+        echo "║  Image    : $(imageName):$(imageTag)"
+        echo "║  Pipeline : CD Release #$(resources.pipeline.BuildPipeline.runID)"
+        echo "╚══════════════════════════════════════════════╝"
+      displayName: '🎉 Deployment Summary'

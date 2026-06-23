@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Space Defender – An epic arcade game by Electronic Arts, powered by Azure DevOps CI/CD." />
+  <title>Space Defender | Electronic Arts Gaming</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ===== BACKGROUND STARS ===== -->
+  <div class="stars" id="stars"></div>
+  <div class="stars2" id="stars2"></div>
+  <div class="stars3" id="stars3"></div>
+
+  <!-- ===== HEADER ===== -->
+  <header class="site-header">
+    <div class="logo">
+      <span class="logo-ea">EA</span>
+      <span class="logo-text">Electronic Arts</span>
+    </div>
+    <nav class="nav-links">
+      <a href="#game-section" id="nav-play">Play</a>
+      <a href="#leaderboard-section" id="nav-leaderboard">Leaderboard</a>
+      <a href="#about-section" id="nav-about">About</a>
+    </nav>
+    <div class="badge" id="pipeline-badge">
+      <span class="badge-dot"></span> CI/CD Live
+    </div>
+  </header>
+
+  <!-- ===== HERO SECTION ===== -->
+  <section class="hero" id="hero-section">
+    <div class="hero-content">
+      <p class="hero-tagline">ELECTRONIC ARTS PRESENTS</p>
+      <h1 class="hero-title">Space<br /><span class="gradient-text">Defender</span></h1>
+      <p class="hero-subtitle">Protect the galaxy. Destroy the invaders. Become a legend.</p>
+      <div class="hero-meta">
+        <span class="meta-chip">🎮 Arcade</span>
+        <span class="meta-chip">⭐ All Ages</span>
+        <span class="meta-chip">🚀 Multiplayer Ready</span>
+      </div>
+      <button class="btn-primary" id="start-btn" onclick="startGame()">
+        <span>▶ Play Now</span>
+      </button>
+      <button class="btn-secondary" id="how-btn" onclick="showHowToPlay()">How to Play</button>
+    </div>
+    <div class="hero-ship" id="hero-ship">🚀</div>
+  </section>
+
+  <!-- ===== HOW TO PLAY MODAL ===== -->
+  <div class="modal-overlay" id="how-modal" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <h2>How to Play</h2>
+      <div class="controls-grid">
+        <div class="control-item">
+          <span class="control-key">← →</span>
+          <span class="control-desc">Move Ship</span>
+        </div>
+        <div class="control-item">
+          <span class="control-key">Space</span>
+          <span class="control-desc">Shoot</span>
+        </div>
+        <div class="control-item">
+          <span class="control-key">P</span>
+          <span class="control-desc">Pause</span>
+        </div>
+        <div class="control-item">
+          <span class="control-key">R</span>
+          <span class="control-desc">Restart</span>
+        </div>
+      </div>
+      <p class="modal-note">Destroy all alien ships before they reach Earth. Survive as long as you can!</p>
+      <button class="btn-primary" onclick="closeModal(); startGame()">Let's Go! 🚀</button>
+    </div>
+  </div>
+
+  <!-- ===== GAME SECTION ===== -->
+  <section class="game-section" id="game-section">
+    <div class="game-wrapper">
+      <div class="game-hud">
+        <div class="hud-item">
+          <span class="hud-label">SCORE</span>
+          <span class="hud-value" id="score-display">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">LEVEL</span>
+          <span class="hud-value" id="level-display">1</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">LIVES</span>
+          <span class="hud-value" id="lives-display">❤️❤️❤️</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">HIGH SCORE</span>
+          <span class="hud-value" id="highscore-display">0</span>
+        </div>
+      </div>
+      <div class="canvas-container">
+        <canvas id="gameCanvas" width="800" height="520"></canvas>
+        <div class="game-overlay" id="game-overlay">
+          <div class="overlay-content" id="overlay-content">
+            <div class="overlay-icon">🚀</div>
+            <h2 id="overlay-title">Space Defender</h2>
+            <p id="overlay-msg">Ready to defend the galaxy?</p>
+            <button class="btn-primary" id="overlay-btn" onclick="startGame()">Start Game</button>
+          </div>
+        </div>
+      </div>
+      <div class="game-controls-hint">
+        <span>← → Move &nbsp;|&nbsp; Space Shoot &nbsp;|&nbsp; P Pause &nbsp;|&nbsp; R Restart</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== LEADERBOARD SECTION ===== -->
+  <section class="leaderboard-section" id="leaderboard-section">
+    <div class="section-container">
+      <h2 class="section-title">🏆 Leaderboard</h2>
+      <p class="section-subtitle">Top Defenders of the Galaxy</p>
+      <div class="leaderboard-table">
+        <div class="lb-header">
+          <span>Rank</span><span>Player</span><span>Score</span><span>Level</span>
+        </div>
+        <div class="lb-row gold" id="lb-1">
+          <span>🥇</span><span>AstroAce</span><span>48,250</span><span>12</span>
+        </div>
+        <div class="lb-row silver" id="lb-2">
+          <span>🥈</span><span>StarPilot</span><span>39,100</span><span>10</span>
+        </div>
+        <div class="lb-row bronze" id="lb-3">
+          <span>🥉</span><span>GalaxyX</span><span>31,500</span><span>9</span>
+        </div>
+        <div class="lb-row" id="lb-4">
+          <span>4</span><span>NovaBurst</span><span>27,800</span><span>8</span>
+        </div>
+        <div class="lb-row" id="lb-5">
+          <span>5</span><span>CosmicRay</span><span>22,450</span><span>7</span>
+        </div>
+        <div class="lb-row you-row" id="lb-you" style="display:none;">
+          <span>★</span><span>YOU</span><span id="lb-your-score">0</span><span id="lb-your-level">1</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ABOUT SECTION ===== -->
+  <section class="about-section" id="about-section">
+    <div class="section-container">
+      <h2 class="section-title">⚙️ Powered by Azure DevOps</h2>
+      <p class="section-subtitle">Enterprise-grade CI/CD pipeline delivering this game to you in real time</p>
+      <div class="pipeline-flow">
+        <div class="pipeline-step">
+          <div class="step-icon">🔀</div>
+          <div class="step-label">GitHub Push</div>
+          <div class="step-desc">Developer commits code</div>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step">
+          <div class="step-icon">🏗️</div>
+          <div class="step-label">Build Pipeline</div>
+          <div class="step-desc">Docker image built & tested</div>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step">
+          <div class="step-icon">📦</div>
+          <div class="step-label">ACR Push</div>
+          <div class="step-desc">Image stored in Azure Container Registry</div>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step">
+          <div class="step-icon">🚀</div>
+          <div class="step-label">Release Pipeline</div>
+          <div class="step-desc">Auto-deploy to Azure App Service</div>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step active">
+          <div class="step-icon">🌐</div>
+          <div class="step-label">Live App</div>
+          <div class="step-desc">You're playing it right now!</div>
+        </div>
+      </div>
+      <div class="tech-stack">
+        <div class="tech-badge">🐳 Docker</div>
+        <div class="tech-badge">☁️ Azure ACR</div>
+        <div class="tech-badge">⚙️ Azure DevOps</div>
+        <div class="tech-badge">🌐 Azure App Service</div>
+        <div class="tech-badge">🔁 GitHub Actions</div>
+        <div class="tech-badge">🛡️ Nginx</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer">
+    <p>© 2026 Electronic Arts Inc. · Deployed via <strong>Azure DevOps</strong> CI/CD Pipeline</p>
+    <p class="footer-note">Built for the Azure DevOps Course-End Project · Version 1.0.0</p>
+  </footer>
+
+  <script src="game.js"></script>
+</body>
+</html>

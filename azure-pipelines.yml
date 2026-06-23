@@ -1,0 +1,126 @@
+# ═══════════════════════════════════════════════════════════════
+# azure-pipelines.yml – CI Build Pipeline
+# Electronic Arts | Space Defender Gaming App
+#
+# TRIGGER: Automatically runs when code is pushed to GitHub
+# STEPS:   Build Docker image → Push to Azure Container Registry
+# ═══════════════════════════════════════════════════════════════
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    exclude:
+      - README.md
+      - docs/**
+
+# ── Variables ──────────────────────────────────────────────────
+variables:
+  # Azure Container Registry details
+  # ✏️  REPLACE with your actual ACR name (no .azurecr.io suffix)
+  acrName:        'easpacegameacr'
+  acrLoginServer: '$(acrName).azurecr.io'
+
+  # Docker image name & tag
+  imageName:      'space-defender'
+  imageTag:       '$(Build.BuildId)'
+  latestTag:      'latest'
+
+  # Azure service connection name for ACR
+  # ✏️  REPLACE with your actual service connection name from Azure DevOps
+  dockerRegistryServiceConnection: 'ACR-ServiceConnection'
+
+  # Build agent
+  vmImageName:    'ubuntu-latest'
+
+# ── Stages ─────────────────────────────────────────────────────
+stages:
+
+# ──────────────────────────────────────────────────────────────
+# STAGE 1: BUILD & PUSH DOCKER IMAGE
+# ──────────────────────────────────────────────────────────────
+- stage: Build
+  displayName: '🏗️ Build & Push Docker Image'
+  jobs:
+
+  - job: BuildAndPush
+    displayName: 'Build Docker Image & Push to ACR'
+    pool:
+      vmImage: $(vmImageName)
+
+    steps:
+
+    # Step 1: Checkout source code from GitHub
+    - checkout: self
+      displayName: '📥 Checkout Source Code from GitHub'
+      clean: true
+
+    # Step 2: Display build info
+    - script: |
+        echo "================================================"
+        echo "  Electronic Arts – Space Defender CI Pipeline"
+        echo "================================================"
+        echo "  Build ID   : $(Build.BuildId)"
+        echo "  Branch     : $(Build.SourceBranchName)"
+        echo "  Commit     : $(Build.SourceVersion)"
+        echo "  Image      : $(acrLoginServer)/$(imageName):$(imageTag)"
+        echo "================================================"
+      displayName: '📋 Display Build Info'
+
+    # Step 3: Build Docker image
+    - task: Docker@2
+      displayName: '🐳 Build Docker Image'
+      inputs:
+        command:            build
+        repository:         '$(acrLoginServer)/$(imageName)'
+        dockerfile:         '$(Build.SourcesDirectory)/Dockerfile'
+        buildContext:       '$(Build.SourcesDirectory)'
+        tags: |
+          $(imageTag)
+          $(latestTag)
+        arguments:          '--no-cache --pull'
+
+    # Step 4: Push Docker image to ACR
+    - task: Docker@2
+      displayName: '📦 Push Image to Azure Container Registry'
+      inputs:
+        command:                  push
+        repository:               '$(acrLoginServer)/$(imageName)'
+        containerRegistry:        $(dockerRegistryServiceConnection)
+        tags: |
+          $(imageTag)
+          $(latestTag)
+
+    # Step 5: Save image metadata as pipeline artifact (passed to Release)
+    - script: |
+        mkdir -p $(Build.ArtifactStagingDirectory)/drop
+        echo '{
+          "acrLoginServer": "$(acrLoginServer)",
+          "imageName":      "$(imageName)",
+          "imageTag":       "$(imageTag)",
+          "buildId":        "$(Build.BuildId)",
+          "branch":         "$(Build.SourceBranchName)",
+          "commit":         "$(Build.SourceVersion)"
+        }' > $(Build.ArtifactStagingDirectory)/drop/image-info.json
+        cat $(Build.ArtifactStagingDirectory)/drop/image-info.json
+      displayName: '📄 Write Image Metadata Artifact'
+
+    # Step 6: Publish artifact (triggers Release Pipeline)
+    - task: PublishBuildArtifacts@1
+      displayName: '🚀 Publish Artifact (Triggers Release Pipeline)'
+      inputs:
+        pathToPublish:  '$(Build.ArtifactStagingDirectory)/drop'
+        artifactName:   'drop'
+        publishLocation: 'Container'
+
+    # Step 7: Build summary
+    - script: |
+        echo ""
+        echo "✅ CI BUILD COMPLETE"
+        echo "------------------------------------------"
+        echo "Image pushed: $(acrLoginServer)/$(imageName):$(imageTag)"
+        echo "Image pushed: $(acrLoginServer)/$(imageName):latest"
+        echo "------------------------------------------"
+      displayName: '✅ Build Summary'

@@ -1,0 +1,25 @@
+# Git ignore file for Space Defender Azure DevOps Project
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor folders
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Node (if added later)
+node_modules/
+npm-debug.log*
+
+# Temp / build artifacts
+*.tmp
+*.log
+dist/
+build/
+
+# Antigravity AI working files
+implementation_plan.md

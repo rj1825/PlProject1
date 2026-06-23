@@ -37,7 +37,7 @@ variables:
   # --- Azure App Service ---
   # ✏️ UPDATE appServiceName once you create it in Azure Portal
   appServiceName:    'space-defender-app'     # The App Service name you create
-  resourceGroup:     'EA-SpaceDefender-RG'    # ✏️ Your actual Resource Group name
+  resourceGroup:     'PLPROJECTS'
   azureSubscription: 'ARM'                    # Your Azure RM service connection
 
   # --- Agent ---

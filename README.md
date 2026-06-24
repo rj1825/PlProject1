@@ -11,8 +11,9 @@
 3. [Project Structure](#project-structure)
 4. [Step-by-Step Setup Guide](#step-by-step-setup-guide)
 5. [Pipeline Configuration](#pipeline-configuration)
-6. [Testing the CI/CD Loop](#testing-the-cicd-loop)
-7. [Troubleshooting](#troubleshooting)
+6. [Managing the Pipelines & Resources (Run, Pause & Stop)](#managing-the-pipelines--resources-run-pause--stop)
+7. [Testing the CI/CD Loop](#testing-the-cicd-loop)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -226,6 +227,69 @@ Before saving, edit these values in release-pipeline.yml:
 
 → Save (do not run manually – it triggers from CI)
 ```
+
+---
+
+## ⚙️ Managing the Pipelines & Resources (Run, Pause & Stop)
+
+Here is how you can control your pipelines and running cloud resources.
+
+### 🏃 How to Run the Pipeline
+* **Automatically**: Every time you push code changes to the `main` or `develop` branches, the CI/CD pipeline triggers automatically.
+* **Manually**: 
+  1. Navigate to **Azure DevOps** > **Pipelines**.
+  2. Click on your pipeline (e.g. `Space-Defender-CI-Build`).
+  3. Click **Run pipeline** in the top right corner.
+  4. Select the target branch and click **Run**.
+
+---
+
+### 🛑 How to Stop or Cancel a Running Pipeline
+If a build or deployment is currently running and you need to stop it immediately:
+1. In **Azure DevOps**, click on the active pipeline run.
+2. In the top right corner, click the **Cancel** button.
+3. Confirm the cancellation. The pipeline agent will terminate the current step and release resources.
+
+---
+
+### ⏸️ How to Pause or Disable Pipeline Triggers (Deactivate Triggers)
+If you want to prevent the pipelines from triggering automatically when code is pushed:
+* **To Pause**: 
+  1. Go to **Pipelines** in Azure DevOps.
+  2. Click the three dots (`...`) next to your pipeline.
+  3. Select **Pause pipeline**. Runs will be queued but won't start until resumed.
+* **To Disable**:
+  1. Click the three dots (`...`) next to the pipeline.
+  2. Select **Settings** (or **Pause/Disable** options depending on your UI version).
+  3. Toggle/set status to **Disabled**. This prevents any runs from being triggered or queued.
+
+---
+
+### 💤 Deactivating Hosting Resources (To Avoid Costs / Overnight Pause)
+Since running cloud services continuously costs money, use these steps to deactivate them temporarily:
+
+#### Option A: For Azure App Service (Web App)
+* **To Deactivate**:
+  * Stop the App Service:
+    ```bash
+    az webapp stop --name space-defender-webapp --resource-group EA-SpaceDefender-RG
+    ```
+  * *Scale down App Service Plan to the Free tier* (to stop host VM charges):
+    ```bash
+    az appservice plan update --name <Your-App-Service-Plan-Name> --resource-group EA-SpaceDefender-RG --sku F1
+    ```
+* **To Relaunch**:
+  * Scale plan back up to your target tier (e.g. `B1`), then start the app:
+    ```bash
+    az webapp start --name space-defender-webapp --resource-group EA-SpaceDefender-RG
+    ```
+
+#### Option B: For Azure Container Apps
+* **To Deactivate (Scale to 0)**:
+  * In the Azure Portal, go to your Container App (`space-defender-app`) > **Scale** > Edit and set min/max replicas to `0`. 
+  * Or, go to **Revision Management**, select the active revision, and click **Deactivate**.
+* **To Relaunch**:
+  * In **Revision Management**, select the revision and click **Activate** (or restore scale minimum replicas to `1`).
 
 ---
 

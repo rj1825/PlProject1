@@ -1,0 +1,108 @@
+================================================================================
+                    AZURE DEVOPS CI/CD PROJECT STUDY GUIDE
+              Project: Space Defender Gaming App Cloud Deployment
+================================================================================
+
+This guide serves as an interview preparation sheet explaining the architecture,
+implementation details, challenges faced, and DevOps concepts demonstrated in 
+this project.
+
+--------------------------------------------------------------------------------
+1. PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+The project implements a complete, automated end-to-end CI/CD pipeline to build 
+and host a lightweight HTML5 Space Defender arcade game for Electronic Arts (EA).
+* Application: HTML5 Canvas, JavaScript, and custom CSS.
+* Server: Nginx (to serve static files securely).
+* Containerization: Docker (encapsulating Nginx and application code).
+* Registry: Azure Container Registry (ACR) to store Docker images.
+* CI/CD: Azure DevOps Multi-stage YAML Pipelines.
+* Hosting: Azure App Service (Web App for Containers) OR Azure Container Apps (ACA).
+
+--------------------------------------------------------------------------------
+2. ARCHITECTURAL WORKFLOW
+--------------------------------------------------------------------------------
+[Developer Git Push] 
+       │
+       ▼
+[GitHub Repository]
+       │ (Webhook triggers pipeline)
+       ▼
+[Azure DevOps CI Stage (Build)]
+       │ 1. Check out code from GitHub
+       │ 2. Log in to ACR (via Service Connection)
+       │ 3. Build & push Docker image (tagged with Build.BuildId and 'latest')
+       ▼
+[Azure Container Registry (ACR)]
+       │ (Triggers CD Stage)
+       ▼
+[Azure DevOps CD Stage (Deploy)]
+       │ 1. Validate image presence in ACR
+       │ 2. Deploy to Azure hosting (App Service / Container App)
+       │ 3. Update App Settings (WEBSITES_ENABLE_APP_SERVICE_STORAGE, registry URLs, etc.)
+       │ 4. Run automated HTTP Smoke Test (curls URL and expects 200 OK)
+       ▼
+[Live Web Application] (Users play game in browser)
+
+--------------------------------------------------------------------------------
+3. TECH STACK & KEY TERMS
+--------------------------------------------------------------------------------
+* Dockerfile: A script containing instructions to build a Docker container.
+  We used 'nginx:alpine' as a base image for a lightweight, secure web server.
+* Nginx: A high-performance web server configured with security headers and
+  optimized routing to serve static HTML5 files.
+* Service Connection: A secure connection in Azure DevOps that allows pipelines
+  to connect to external services (GitHub, ACR, Azure Subscriptions) without
+  hardcoding credentials.
+* YAML Pipelines: Pipeline-as-Code. Replaces classic visual pipelines, enabling
+  version control for pipeline configurations.
+
+--------------------------------------------------------------------------------
+4. KEY CHALLENGES & HOW WE RESOLVED THEM (Crucial for Interviews!)
+--------------------------------------------------------------------------------
+Q1: You faced a "The process '/usr/bin/docker' failed with exit code 1" during
+    the push stage. Why did this happen and how did you resolve it?
+A1: Initially, the pipeline had two separate Docker tasks: one for building and
+    one for pushing. In modern containerized agents, the image built by the 
+    first task might not persist locally in the second task's context, causing
+    an "image does not exist locally" error. We resolved this by combining the 
+    actions into a single Docker task using the 'buildAndPush' command.
+
+Q2: You got a quota limit error ("Current Limit (total VMs): 0") in Central India.
+    What caused this and how did you approach it?
+A2: Azure free-tier subscriptions often restrict the deployment of virtual machines 
+    and App Service Plans in specific regions (like Central India) to prevent 
+    abuse or because of capacity limits. We resolved this by:
+    1. Recommending deploying the resources to regions with higher capacity 
+       (e.g., East US, West Europe) where Free (F1) / Basic (B1) plans are readily available.
+    2. Providing an alternative deployment path using Azure Container Apps (ACA),
+       which scales to 0 when idle and has lower quota restrictions.
+
+--------------------------------------------------------------------------------
+5. PIPELINE & COST MANAGEMENT CONCEPTS
+--------------------------------------------------------------------------------
+Q1: How do you pause or deactivate the pipeline triggers?
+A1: By using the "Pause pipeline" feature in the Azure DevOps Portal (under
+    pipeline settings) or setting the pipeline state to "Disabled". This is 
+    extremely useful during maintenance or when you want to push commits without
+    starting costly build agent runs.
+
+Q2: How do you minimize or stop costs overnight for this infrastructure?
+A2: Cloud resources are billed based on uptime and scale. To stop charges:
+    * For App Services: Stop the App Service (stops container execution) and scale
+      the App Service Plan down to the Free (F1) tier (stops VM billing).
+    * For Container Apps: Scale the replica count (minimum/maximum) to 0, or 
+      deactivate the active revision in Revision Management.
+    * For ACR: Keep it at the Basic tier (very cheap, ~$0.16/day) to retain images.
+
+--------------------------------------------------------------------------------
+6. CORE DEVOPS PRINCIPLES DEMONSTRATED
+--------------------------------------------------------------------------------
+* Continuous Integration (CI): Every commit builds the container image and 
+  runs validation tests, preventing broken builds from reaching registry.
+* Continuous Deployment (CD): Automates release validation, environment-specific
+  configuration updates, web server restarts, and smoke-testing.
+* Shift-Left Verification: The CD pipeline performs an automated smoke test
+  immediately after deployment. If the test fails, developers are notified
+  immediately before users notice the service interruption.
+================================================================================

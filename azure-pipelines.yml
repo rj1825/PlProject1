@@ -170,7 +170,9 @@ stages:
                 az containerapp update \
                   --name $(appServiceName) \
                   --resource-group $(resourceGroup) \
-                  --image $(acrLoginServer)/$(imageName):$(imageTag)
+                  --image $(acrLoginServer)/$(imageName):$(imageTag) \
+                  --ingress external \
+                  --target-port 80
                 echo "✅ Container App updated successfully"
 
           # ── Step 4: Wait for deployment to complete ────────────
